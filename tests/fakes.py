@@ -10,7 +10,7 @@ from pathlib import Path
 from crucible.deadline import Deadline
 from crucible.domain.schema import AgentOutcome, ResourceLimits, Task, Verdict
 from crucible.errors import SandboxError, SandboxFileNotFoundError
-from crucible.ports.sandbox import ExecResult, ImageRef, WorkspaceSnapshot
+from crucible.ports.sandbox import ExecResult, ImageRef, Sandbox, WorkspaceSnapshot
 
 ExecHandler = Callable[[str], ExecResult]
 
@@ -117,7 +117,7 @@ class FakeBackend:
         self.removed.append(image)
 
 
-SolveFn = Callable[[FakeSandbox, Task, Deadline], AgentOutcome]
+SolveFn = Callable[[Sandbox, Task, Deadline], AgentOutcome]
 
 
 @dataclass
@@ -130,7 +130,7 @@ class ScriptedAgent:
     def name(self) -> str:
         return self.agent_name
 
-    def solve(self, sandbox: FakeSandbox, task: Task, deadline: Deadline) -> AgentOutcome:
+    def solve(self, sandbox: Sandbox, task: Task, deadline: Deadline) -> AgentOutcome:
         self.calls += 1
         return self.solve_fn(sandbox, task, deadline)
 
