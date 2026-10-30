@@ -36,3 +36,5 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - run: uv run pytest -m docker -v
+        env:
+          CRUCIBLE_REQUIRE_DOCKER: "1"

@@ -22,6 +22,4 @@ def configure_logging(level: str) -> None:
     root.addHandler(handler)
     root.setLevel(numeric)
     for name in _NOISY_LOGGERS:
-        logging.getLogger(name).setLevel(
-            min(logging.WARNING, numeric) if numeric <= logging.DEBUG else logging.WARNING
-        )
+        logging.getLogger(name).setLevel(logging.WARNING)
