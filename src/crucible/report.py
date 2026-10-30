@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from crucible.domain.calibration import Calibration
-from crucible.domain.schema import TaskResult
+from crucible.domain.schema import Score, TaskResult
 
 
 def _fmt(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.3f}"
+
+
+def _pass_at_k_part(score: Score) -> str:
+    # pass@1 is always shown; only add the pass@k column when k differs.
+    if score.k == 1:
+        return ""
+    return f"pass@{score.k}: {_fmt(score.pass_at_k)}  "
 
 
 def format_summary(result: TaskResult) -> str:
@@ -17,7 +24,7 @@ def format_summary(result: TaskResult) -> str:
         f"agent:  {result.agent}",
         (
             f"trials: {score.n}  passed: {score.c}  pass@1: {_fmt(score.pass_at_1)}  "
-            f"pass@{score.k}: {_fmt(score.pass_at_k)}  mean reward: {_fmt(score.mean_reward)}"
+            f"{_pass_at_k_part(score)}mean reward: {_fmt(score.mean_reward)}"
         ),
         "",
         f"{'#':>3}  {'status':<15}{'reward':>6}  {'time':>7}  reason",

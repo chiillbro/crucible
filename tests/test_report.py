@@ -12,7 +12,8 @@ def test_summary_lists_scores_and_trials() -> None:
     text = format_summary(result)
     assert "task:   t  (/t)" in text
     assert "agent:  oracle" in text
-    assert "trials: 2  passed: 1  pass@1: 0.500  pass@1: 0.500  mean reward: 0.500" in text
+    assert "trials: 2  passed: 1  pass@1: 0.500  mean reward: 0.500" in text
+    assert text.count("pass@1:") == 1
     assert "  0  passed              1" in text
     assert "  1  failed              0" in text
     assert text.rstrip().endswith("x")

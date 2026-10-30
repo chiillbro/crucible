@@ -74,7 +74,7 @@ output, and prints a summary:
 ```
 task:   fix-config-parser  (/path/to/tasks/fix-config-parser)
 agent:  oracle
-trials: 3  passed: 3  pass@1: 1.000  pass@1: 1.000  mean reward: 1.000
+trials: 3  passed: 3  pass@1: 1.000  mean reward: 1.000
 
   #  status         reward     time  reason
   0  passed              1     0.8s
