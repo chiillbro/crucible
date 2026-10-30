@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -41,3 +42,29 @@ def make_task_dir(tmp_path: Path) -> TaskDirFactory:
         return root
 
     return _make
+
+
+def _docker_available() -> bool:
+    try:
+        import docker
+
+        docker.from_env().ping()
+    except Exception:  # any failure means "no usable daemon"
+        return False
+    return True
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Skip ``@pytest.mark.docker`` tests when no daemon is reachable.
+
+    Set ``CRUCIBLE_REQUIRE_DOCKER=1`` (CI does) to fail instead of skipping, so a broken
+    Docker setup can never masquerade as a green run.
+    """
+    docker_items = [item for item in items if "docker" in item.keywords]
+    if not docker_items or _docker_available():
+        return
+    if os.environ.get("CRUCIBLE_REQUIRE_DOCKER"):
+        pytest.exit("CRUCIBLE_REQUIRE_DOCKER is set but the Docker daemon is unreachable", 1)
+    skip = pytest.mark.skip(reason="Docker daemon not available")
+    for item in docker_items:
+        item.add_marker(skip)
