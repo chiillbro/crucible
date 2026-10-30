@@ -1,0 +1,18 @@
+[task]
+name = "fix-config-parser"
+description = "Fix two tokenisation bugs in a small INI-style config parser: values containing '=' are truncated and comment markers inside quoted values are honoured."
+difficulty = "medium"
+tags = ["python", "parsing", "bug-fix"]
+
+[environment]
+workdir = "/workspace"
+build_timeout_seconds = 600
+
+[agent]
+timeout_seconds = 900
+cpus = 1.0
+memory = "1g"
+pids_limit = 256
+
+[verifier]
+timeout_seconds = 120
