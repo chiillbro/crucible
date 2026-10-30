@@ -16,10 +16,10 @@ class Verifier(Protocol):
     the task: no clock, no network, no randomness.
     """
 
-    def prepare(self, task: Task, environment: ImageRef) -> ImageRef | None:
+    def prepare(self, task: Task, environment: ImageRef) -> tuple[ImageRef, ...]:
         """Build whatever the verifier needs on top of ``environment``.
 
-        Returns the verifier image if one was built, so the run can record and remove it.
+        Returns every image it built, so the run can record and remove them.
 
         Raises:
             BuildError: the verifier image could not be built.

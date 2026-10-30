@@ -13,10 +13,12 @@ from crucible.domain.schema import ResourceLimits
 
 @dataclass(frozen=True)
 class ImageRef:
-    """A built image: the tag Crucible assigned and the backend's content identifier."""
+    """A built image: the tag Crucible assigned, the backend's content identifier, and
+    the user the image is configured to run as."""
 
     tag: str
     id: str
+    user: str
 
 
 @dataclass(frozen=True)
@@ -38,7 +40,8 @@ class WorkspaceSnapshot:
     """The agent's resulting workspace, exported from the sandbox as a tar archive.
 
     ``archive`` is a host path; ``root`` is the container path the archive was taken
-    from. Extracting the archive at ``/`` recreates ``root`` exactly as the agent left it.
+    from. The archive's top-level entry is ``root``'s basename, so extracting it into
+    ``root``'s parent recreates ``root`` exactly as the agent left it.
     """
 
     archive: Path
@@ -81,6 +84,10 @@ class Sandbox(Protocol):
         """Export the workspace directory to a tar archive at host path ``dest``."""
         ...
 
+    def restore(self, snapshot: WorkspaceSnapshot) -> None:
+        """Recreate ``snapshot.root`` inside this sandbox exactly as it was exported."""
+        ...
+
     def kill(self) -> None:
         """Stop the sandbox immediately. Idempotent."""
         ...
@@ -110,12 +117,8 @@ class SandboxBackend(Protocol):
         *,
         workdir: str,
         limits: ResourceLimits,
-        scratch_mounts: tuple[str, ...] = (),
     ) -> AbstractContextManager[Sandbox]:
         """Start a sandbox from ``image``; leaving the context always removes it.
-
-        ``scratch_mounts`` are container paths that are masked with an empty, writable
-        in-memory filesystem, hiding whatever the image holds there.
 
         Raises:
             SandboxError: the container could not be created or started.

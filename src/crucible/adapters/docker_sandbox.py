@@ -106,8 +106,9 @@ class DockerSandboxBackend:
             msg = f"build of {tag} failed with exit code {proc.returncode}:\n{tail}"
             raise BuildError(msg)
         image = self._client.images.get(tag)
+        user = str((image.attrs.get("Config") or {}).get("User") or "")
         log.info("built %s (%s) in %.1fs", tag, image.short_id, time.monotonic() - started)
-        return ImageRef(tag=tag, id=str(image.id))
+        return ImageRef(tag=tag, id=str(image.id), user=user)
 
     @contextmanager
     def start(
@@ -116,7 +117,6 @@ class DockerSandboxBackend:
         *,
         workdir: str,
         limits: ResourceLimits,
-        scratch_mounts: tuple[str, ...] = (),
     ) -> Iterator[DockerSandbox]:
         self._check_user(image)
         try:
@@ -133,7 +133,6 @@ class DockerSandboxBackend:
                 cap_drop=["ALL"],
                 security_opt=["no-new-privileges"],
                 init=True,
-                tmpfs=dict.fromkeys(scratch_mounts, "mode=1777"),
                 labels={MANAGED_LABEL: "true"},
             )
         except docker.errors.DockerException as exc:
@@ -164,13 +163,7 @@ class DockerSandboxBackend:
     def _check_user(self, image: ImageRef) -> None:
         if self._allow_root:
             return
-        try:
-            config = self._client.images.get(image.id).attrs.get("Config") or {}
-        except docker.errors.DockerException as exc:
-            msg = f"could not inspect image {image.tag}: {exc}"
-            raise SandboxError(msg) from exc
-        user = str(config.get("User") or "")
-        if user in ("", "root", "0") or user.startswith(("root:", "0:")):
+        if is_root_user(image.user):
             msg = (
                 f"image {image.tag} runs as root; set a non-root USER in its Dockerfile "
                 "(or construct the backend with allow_root=True)"
@@ -328,6 +321,14 @@ class DockerSandbox:
             raise SandboxError(msg) from exc
         return WorkspaceSnapshot(archive=dest, root=self._workdir)
 
+    def restore(self, snapshot: WorkspaceSnapshot) -> None:
+        self._ensure_alive()
+        # get_archive names the archive root after the directory's basename, so the
+        # archive must be extracted into the directory's parent.
+        parent = str(PurePosixPath(snapshot.root).parent)
+        with snapshot.archive.open("rb") as fh:
+            self._put_archive(parent, fh.read())
+
     def kill(self) -> None:
         if self._killed:
             return
@@ -371,6 +372,12 @@ class DockerSandbox:
         except docker.errors.DockerException as exc:
             msg = f"could not copy files into {parent}: {exc}"
             raise SandboxError(msg) from exc
+
+
+def is_root_user(user: str) -> bool:
+    """True if a Dockerfile ``USER`` value (``name[:group]`` or ``uid[:gid]``) means root."""
+    name = user.split(":", 1)[0]
+    return name in ("", "root", "0")
 
 
 def _decode(data: bytes) -> str:

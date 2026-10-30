@@ -223,10 +223,9 @@ def test_container_is_removed_when_body_raises(
     assert after == before
 
 
-def test_scratch_mount_hides_image_content(backend: DockerSandboxBackend, image: ImageRef) -> None:
-    with backend.start(image, workdir=WORKDIR, limits=LIMITS, scratch_mounts=(WORKDIR,)) as sb:
-        assert sb.exec("ls -A", timeout=30).stdout == ""
-        assert sb.exec("touch probe && ls", timeout=30).stdout == "probe\n"
+def test_build_reports_image_user(image: ImageRef, root_image: ImageRef) -> None:
+    assert image.user == "agent"
+    assert root_image.user == ""
 
 
 def test_root_image_is_refused_unless_allowed(
@@ -260,10 +259,25 @@ def test_build_without_dockerfile(backend: DockerSandboxBackend, tmp_path: Path)
 
 
 def test_remove_missing_image_is_quiet(backend: DockerSandboxBackend) -> None:
-    backend.remove_image(ImageRef(tag="crucible/does-not-exist:never", id="sha256:0"))
+    backend.remove_image(ImageRef(tag="crucible/does-not-exist:never", id="sha256:0", user="x"))
 
 
 def test_unreachable_daemon_is_a_sandbox_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DOCKER_HOST", "tcp://127.0.0.1:1")
     with pytest.raises(SandboxError, match="cannot reach the Docker daemon"):
         DockerSandboxBackend()
+
+
+def test_restore_recreates_snapshot_exactly(
+    backend: DockerSandboxBackend, image: ImageRef, tmp_path: Path
+) -> None:
+    with backend.start(image, workdir=WORKDIR, limits=LIMITS) as sb:
+        sb.exec("rm original.txt && mkdir -p pkg && echo 'v = 1' > pkg/mod.py", timeout=30)
+        snap = sb.snapshot(tmp_path / "ws.tar")
+    with backend.start(image, workdir=WORKDIR, limits=LIMITS) as sb:
+        sb.exec("find . -mindepth 1 -delete", timeout=30)
+        sb.restore(snap)
+        listing = sb.exec(
+            "find . -type f | sort && cat pkg/mod.py && stat -c %u pkg/mod.py", timeout=30
+        ).stdout
+    assert listing == "./pkg/mod.py\nv = 1\n1000\n"
