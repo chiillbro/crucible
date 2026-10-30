@@ -1,0 +1,118 @@
+[project]
+name = "crucible-harness"
+version = "0.1.0"
+description = "Sandboxed coding-agent evaluation harness: author a task, run an agent in an isolated container, grade with hidden tests and pass@k."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Siva Sankar Reddy" }]
+requires-python = ">=3.11"
+keywords = ["evaluation", "coding-agents", "benchmark", "docker", "pass-at-k"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Testing",
+  "Typing :: Typed",
+]
+dependencies = [
+  "anthropic>=2.0,<3",
+  "docker>=7.1,<8",
+  "pydantic>=2.11,<3",
+  "pydantic-settings>=2.10,<3",
+  "typer>=0.16,<1",
+]
+
+[project.urls]
+Homepage = "https://github.com/chiillbro/crucible"
+Issues = "https://github.com/chiillbro/crucible/issues"
+
+[project.scripts]
+crucible = "crucible.cli:app"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.17",
+  "pytest>=8.4,<10",
+  "pytest-cov>=6.0,<8",
+  "ruff>=0.12",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crucible"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",    # pycodestyle
+  "F",         # pyflakes
+  "I",         # isort
+  "UP",        # pyupgrade
+  "B",         # bugbear
+  "SIM",       # simplify
+  "N",         # pep8 naming
+  "C4",        # comprehensions
+  "PT",        # pytest style
+  "RET",       # return
+  "RUF",       # ruff-specific
+  "ANN",       # annotations
+  "ARG",       # unused arguments
+  "PTH",       # pathlib over os.path
+  "T20",       # no print
+  "ERA",       # no commented-out code
+  "TID",       # tidy imports
+  "ISC",       # implicit string concat
+  "PIE",       # misc
+]
+ignore = [
+  "ANN401",    # Any is allowed at adapter boundaries
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ARG", "ANN"]
+"tasks/**" = ["ANN", "T20", "PTH"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["crucible"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+mypy_path = "src"
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["docker", "docker.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "docker: needs a running Docker daemon (deselect with -m 'not docker')",
+]
+
+[tool.coverage.run]
+source = ["crucible"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "^\\s*\\.\\.\\.$",
+  "raise NotImplementedError",
+]
