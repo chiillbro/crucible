@@ -43,8 +43,8 @@ class AgentName(StrEnum):
     NOP = "nop"
 
 
-def make_backend() -> SandboxBackend:
-    return DockerSandboxBackend()
+def make_backend(*, reuse_images: bool = True) -> SandboxBackend:
+    return DockerSandboxBackend(reuse_images=reuse_images)
 
 
 def make_verifier(backend: SandboxBackend) -> Verifier:
@@ -90,9 +90,16 @@ def _run_dir(out: Path, task: Task, label: str) -> Path:
 
 
 def _execute(
-    task: Task, agent: Agent, *, trials: int, k: int, run_dir: Path, rm_images: bool
+    task: Task,
+    agent: Agent,
+    *,
+    trials: int,
+    k: int,
+    run_dir: Path,
+    rm_images: bool,
+    rebuild: bool,
 ) -> TaskResult:
-    backend = make_backend()
+    backend = make_backend(reuse_images=not rebuild)
     runner = Runner(
         backend=backend,
         agent=agent,
@@ -109,6 +116,10 @@ OutOpt = Annotated[Path, typer.Option("--out", help="Directory for run artifacts
 RmImagesOpt = Annotated[
     bool, typer.Option("--rm-images", help="Delete the images this run built when done.")
 ]
+RebuildOpt = Annotated[
+    bool,
+    typer.Option("--rebuild", help="Rebuild images even if their content-addressed tag exists."),
+]
 
 
 @app.command()
@@ -121,6 +132,7 @@ def run(
     k: Annotated[int, typer.Option("--k", min=1, help="k for pass@k.")] = 1,
     out: OutOpt = Path("runs"),
     rm_images: RmImagesOpt = False,
+    rebuild: RebuildOpt = False,
 ) -> None:
     """Evaluate an agent on a task over N trials and report pass@k."""
     task = _load(task_dir)
@@ -133,6 +145,7 @@ def run(
             k=k,
             run_dir=run_dir,
             rm_images=rm_images,
+            rebuild=rebuild,
         )
     except CrucibleError as exc:
         typer.echo(f"error: {exc}", err=True)
@@ -149,16 +162,29 @@ def validate(
     trials: TrialsOpt = 3,
     out: OutOpt = Path("runs"),
     rm_images: RmImagesOpt = False,
+    rebuild: RebuildOpt = False,
 ) -> None:
     """Check calibration: the oracle must always pass and nop must always fail."""
     task = _load(task_dir)
     run_dir = _run_dir(out, task, "validate")
     try:
         oracle = _execute(
-            task, OracleAgent(), trials=trials, k=1, run_dir=run_dir / "oracle", rm_images=False
+            task,
+            OracleAgent(),
+            trials=trials,
+            k=1,
+            run_dir=run_dir / "oracle",
+            rm_images=False,
+            rebuild=rebuild,
         )
         nop = _execute(
-            task, NopAgent(), trials=trials, k=1, run_dir=run_dir / "nop", rm_images=rm_images
+            task,
+            NopAgent(),
+            trials=trials,
+            k=1,
+            run_dir=run_dir / "nop",
+            rm_images=rm_images,
+            rebuild=False,
         )
     except CrucibleError as exc:
         typer.echo(f"error: {exc}", err=True)

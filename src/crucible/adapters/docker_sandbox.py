@@ -49,6 +49,10 @@ class DockerSandboxBackend:
         docker_cli: executable used for ``docker build``.
         allow_root: permit images whose ``USER`` is root. Off by default so a task cannot
             accidentally grant the agent root inside the container.
+        reuse_images: skip the build when an image with the requested tag already exists.
+            Tags are content-addressed, so a hit means the build context is unchanged.
+            BuildKit assigns a fresh image id on every build, so rebuilding would orphan
+            the previous image each run.
     """
 
     def __init__(
@@ -57,6 +61,7 @@ class DockerSandboxBackend:
         *,
         docker_cli: str = "docker",
         allow_root: bool = False,
+        reuse_images: bool = True,
     ) -> None:
         try:
             self._client = client if client is not None else docker.from_env()
@@ -66,6 +71,7 @@ class DockerSandboxBackend:
             raise SandboxError(msg) from exc
         self._docker_cli = docker_cli
         self._allow_root = allow_root
+        self._reuse_images = reuse_images
 
     def build_image(
         self,
@@ -79,6 +85,9 @@ class DockerSandboxBackend:
         if not dockerfile.is_file():
             msg = f"no Dockerfile in build context {context}"
             raise BuildError(msg)
+        if self._reuse_images and (existing := self._find_image(tag)) is not None:
+            log.info("reusing image %s", tag)
+            return existing
         cmd = [self._docker_cli, "build", "--progress=plain", "--tag", tag]
         for key, value in (build_args or {}).items():
             cmd += ["--build-arg", f"{key}={value}"]
@@ -105,9 +114,22 @@ class DockerSandboxBackend:
             tail = "\n".join(proc.stderr.splitlines()[-_BUILD_LOG_TAIL_LINES:])
             msg = f"build of {tag} failed with exit code {proc.returncode}:\n{tail}"
             raise BuildError(msg)
-        image = self._client.images.get(tag)
+        built = self._find_image(tag)
+        if built is None:
+            msg = f"build of {tag} reported success but the image is missing"
+            raise BuildError(msg)
+        log.info("built %s (%s) in %.1fs", tag, built.id[7:19], time.monotonic() - started)
+        return built
+
+    def _find_image(self, tag: str) -> ImageRef | None:
+        try:
+            image = self._client.images.get(tag)
+        except docker.errors.ImageNotFound:
+            return None
+        except docker.errors.DockerException as exc:
+            msg = f"could not inspect image {tag}: {exc}"
+            raise BuildError(msg) from exc
         user = str((image.attrs.get("Config") or {}).get("User") or "")
-        log.info("built %s (%s) in %.1fs", tag, image.short_id, time.monotonic() - started)
         return ImageRef(tag=tag, id=str(image.id), user=user)
 
     @contextmanager

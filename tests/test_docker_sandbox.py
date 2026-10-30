@@ -281,3 +281,20 @@ def test_restore_recreates_snapshot_exactly(
             "find . -type f | sort && cat pkg/mod.py && stat -c %u pkg/mod.py", timeout=30
         ).stdout
     assert listing == "./pkg/mod.py\nv = 1\n1000\n"
+
+
+def test_build_reuses_existing_tag_unless_disabled(
+    backend: DockerSandboxBackend, tmp_path: Path
+) -> None:
+    (tmp_path / "Dockerfile").write_text("FROM python:3.12-slim\nUSER nobody\n")
+    tag = "crucible/test-reuse:dev"
+    first = backend.build_image(tmp_path, tag=tag, timeout=600)
+    try:
+        assert backend.build_image(tmp_path, tag=tag, timeout=600) == first
+        rebuilt = DockerSandboxBackend(reuse_images=False).build_image(
+            tmp_path, tag=tag, timeout=600
+        )
+        assert rebuilt.tag == tag
+        assert rebuilt.id != first.id  # BuildKit mints a new id per build
+    finally:
+        backend.remove_image(first)

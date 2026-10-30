@@ -21,7 +21,7 @@ runner = CliRunner()
 @pytest.fixture
 def fake_ports(monkeypatch: pytest.MonkeyPatch) -> FakeVerifier:
     verifier = FakeVerifier()
-    monkeypatch.setattr(cli, "make_backend", FakeBackend)
+    monkeypatch.setattr(cli, "make_backend", lambda **_: FakeBackend())
     monkeypatch.setattr(cli, "make_verifier", lambda _backend: verifier)
     return verifier
 
@@ -79,7 +79,7 @@ def test_run_reports_crucible_errors(
     make_task_dir: TaskDirFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        cli, "make_backend", lambda: FakeBackend(build_error=BuildError("step failed"))
+        cli, "make_backend", lambda **_: FakeBackend(build_error=BuildError("step failed"))
     )
     monkeypatch.setattr(cli, "make_verifier", lambda _b: FakeVerifier())
     result = runner.invoke(cli.app, ["run", str(make_task_dir())])
@@ -90,7 +90,7 @@ def test_run_reports_crucible_errors(
 def test_run_reports_unreachable_backend(
     make_task_dir: TaskDirFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def unreachable() -> SandboxBackend:
+    def unreachable(**_: object) -> SandboxBackend:
         msg = "cannot reach the Docker daemon"
         raise SandboxError(msg)
 
