@@ -31,8 +31,16 @@ class SandboxTimeoutError(SandboxError):
     """A command exceeded its deadline. The sandbox is killed and unusable afterwards."""
 
 
+class SandboxFileNotFoundError(SandboxError):
+    """A file read from the sandbox does not exist."""
+
+
 class AgentError(CrucibleError):
     """The agent could not run or crashed (API failure, malformed tool call, ...)."""
+
+
+class AgentTimeoutError(AgentError):
+    """The agent exceeded the task's solve budget and its sandbox was killed."""
 
 
 class VerifierError(CrucibleError):
