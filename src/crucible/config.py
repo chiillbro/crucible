@@ -20,7 +20,7 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("ANTHROPIC_API_KEY", "CRUCIBLE_ANTHROPIC_API_KEY"),
     )
-    llm_model: str = "claude-sonnet-5-5"
+    llm_model: str = "claude-opus-5-5"
     llm_max_steps: int = Field(default=30, ge=1)
     llm_max_tokens: int = Field(default=4096, ge=256)
     log_level: str = "INFO"

@@ -9,16 +9,17 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
+import anthropic
 import typer
 
 from crucible import __version__
-from crucible.adapters.agents import NopAgent, OracleAgent
+from crucible.adapters.agents import LlmAgent, NopAgent, OracleAgent
 from crucible.adapters.docker_sandbox import DockerSandboxBackend
 from crucible.adapters.pytest_verifier import PytestVerifier
 from crucible.config import Settings
 from crucible.domain.calibration import Calibration
 from crucible.domain.schema import Task, TaskResult, load_task
-from crucible.errors import CrucibleError
+from crucible.errors import ConfigError, CrucibleError
 from crucible.logging import configure_logging
 from crucible.ports import Agent, SandboxBackend, Verifier
 from crucible.report import format_calibration, format_summary
@@ -41,6 +42,7 @@ EXIT_USAGE = 2
 class AgentName(StrEnum):
     ORACLE = "oracle"
     NOP = "nop"
+    LLM = "llm"
 
 
 def make_backend(*, reuse_images: bool = True) -> SandboxBackend:
@@ -51,10 +53,21 @@ def make_verifier(backend: SandboxBackend) -> Verifier:
     return PytestVerifier(backend)
 
 
-def make_agent(name: AgentName, settings: Settings) -> Agent:  # noqa: ARG001
+def make_agent(name: AgentName, settings: Settings) -> Agent:
     if name is AgentName.ORACLE:
         return OracleAgent()
-    return NopAgent()
+    if name is AgentName.NOP:
+        return NopAgent()
+    if settings.anthropic_api_key is None:
+        msg = "ANTHROPIC_API_KEY is not set; the llm agent needs it (see .env.example)"
+        raise ConfigError(msg)
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key.get_secret_value())
+    return LlmAgent(
+        client.messages,
+        model=settings.llm_model,
+        max_steps=settings.llm_max_steps,
+        max_tokens=settings.llm_max_tokens,
+    )
 
 
 def _version_callback(value: bool) -> None:

@@ -44,7 +44,8 @@ class FakeSandbox:
         try:
             return self.files[path]
         except KeyError as exc:
-            raise SandboxFileNotFoundError(path) from exc
+            msg = f"no such file in sandbox: {path}"
+            raise SandboxFileNotFoundError(msg) from exc
 
     def write_file(self, path: str, content: bytes, *, mode: int = 0o644) -> None:
         self._ensure_alive()
